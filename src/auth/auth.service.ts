@@ -1,7 +1,7 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { User } from './schema/user.schema';
-import { CreateUserDto, VerifyDto } from './dto/user.dto';
+import { CreateUserDto, LoginDto, VerifyDto } from './dto/user.dto';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer'
 import { JwtService } from '@nestjs/jwt';
@@ -72,4 +72,27 @@ export class AuthService {
 
         return {message:"Verify"}
     }
+
+    
+  async login(loginDto: LoginDto): Promise<{ access_token: string }> {
+
+    const{email,password}= loginDto
+
+    const foundedUser = await this.userModel.findOne({where:{email}});
+    if (!foundedUser) {
+      throw new UnauthorizedException("user not found");
+    }
+
+
+    const decode = await bcrypt.compare(password,foundedUser.dataValues.password)
+
+    if(decode && foundedUser.dataValues.isVerify){
+       const  payload = { sub: foundedUser.dataValues.id, username: foundedUser.dataValues.username,}
+       return {
+        access_token: await this.jwtService.signAsync(payload),
+       }
+    }   else{
+        throw new BadRequestException("invalid password")
+    }      
+  }
 }
